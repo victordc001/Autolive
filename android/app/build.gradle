@@ -54,37 +54,45 @@ react {
     autolinkLibrariesWithApp()
 }
 
-/**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
- */
+// You can toggle Proguard minification here for release builds
 def enableProguardInReleaseBuilds = false
 
-/**
- * The preferred build flavor of JavaScriptCore (JSC)
- *
- * For example, to use the international variant, you can use:
- * `def jscFlavor = io.github.react-native-community:jsc-android-intl:2026004.+`
- *
- * The international variant includes ICU i18n library and necessary data
- * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
- * give correct results when using with locales other than en-US. Note that
- * this variant is about 6MiB larger per architecture than default.
- */
+// JavaScriptCore flavor - Intl variant available for better locale support
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+// ---- ADDED: Load environment variables from project properties or environment variables ----
+// This function safely loads a property or environment variable with a fallback default.
+def getEnvVar = { key, defaultValue = '' ->
+    def value = System.getenv(key)
+    if (value == null || value.isEmpty()) {
+        return project.hasProperty(key) ? project.property(key) : defaultValue
+    }
+    return value
+}
+
+// Load keystore properties here using getEnvVar
+def keystoreProperties = [
+    storeFile: getEnvVar("MYAPP_UPLOAD_STORE_FILE"),
+    keyAlias: getEnvVar("MYAPP_UPLOAD_KEY_ALIAS"),
+    storePassword: getEnvVar("MYAPP_UPLOAD_STORE_PASSWORD"),
+    keyPassword: getEnvVar("MYAPP_UPLOAD_KEY_PASSWORD")
+]
+// ---- END OF ADDED SECTION ----
 
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdk rootProject.ext.compileSdkVersion
+    compileSdk rootProject.ext.compileSdkVersion 
+    namespace "com.autolive"   
 
-    namespace "com.autolive"
     defaultConfig {
         applicationId "com.autolive"
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 24
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -92,22 +100,36 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // Use loaded keystore properties only if they exist
+            if (keystoreProperties.storeFile != null && keystoreProperties.storeFile != '') {
+                storeFile file(keystoreProperties.storeFile)
+                storePassword keystoreProperties.storePassword
+                keyAlias keystoreProperties.keyAlias
+                keyPassword keystoreProperties.keyPassword
+            } else {
+                // Fallback to default debug if no keystore is defined (optional)
+                println "Warning: Keystore properties not found. Release signing config will not be set properly."
+            }
+        }
     }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
-        release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+        release { 
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
 }
 
-dependencies {
+dependencies { 
+    configurations.all {
+        exclude group: 'org.jitsi', module: 'webrtc'
+    }
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 

@@ -1,4 +1,8 @@
-# OSX
+# OSX 
+
+# Env file
+.env
+
 #
 .DS_Store
 
